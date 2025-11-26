@@ -1,0 +1,257 @@
+#root {
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #1b1f32, #0f111c 55%);
+  color: #f5f6ff;
+}
+
+.app-shell {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 2rem clamp(1.5rem, 4vw, 3rem) 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: #8f94ff;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+}
+
+.lede {
+  margin-top: 0.5rem;
+  max-width: 50ch;
+  color: #cdd0ff;
+}
+
+.header-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.ghost {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: #f5f6ff;
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.status-chip {
+  padding: 0.5rem 0.9rem;
+  background: rgba(143, 148, 255, 0.15);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  color: #cdd0ff;
+  border: 1px solid rgba(143, 148, 255, 0.35);
+}
+
+.status-chip.busy {
+  background: rgba(255, 149, 0, 0.15);
+  border-color: rgba(255, 149, 0, 0.4);
+  color: #ffc165;
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.panel {
+  background: rgba(18, 21, 38, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  padding: 1.5rem;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+}
+
+.panel + .panel {
+  margin-top: 1rem;
+}
+
+.panel-header h2,
+.panel-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.panel-header p {
+  margin: 0.35rem 0 0;
+  color: #a9adcf;
+  font-size: 0.95rem;
+}
+
+.upload-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.primary {
+  width: 100%;
+  border: none;
+  background: linear-gradient(120deg, #ff0066, #ff8a00);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(255, 0, 102, 0.3);
+}
+
+.primary:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.tools-panel .panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.tool-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tool-buttons {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.tool-buttons button {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.tool-buttons button.active {
+  background: rgba(255, 0, 102, 0.2);
+  border-color: rgba(255, 0, 102, 0.6);
+}
+
+input[type='color'] {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 12px;
+  border: none;
+  padding: 0;
+  background: none;
+}
+
+input[type='range'] {
+  width: 60%;
+}
+
+.toggle {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.4rem 1rem;
+  font-weight: 600;
+}
+
+.timeline-panel {
+  margin-top: 1.5rem;
+}
+
+.timeline-strip {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 0.5rem;
+}
+
+.timeline-frame {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0.25rem;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.timeline-frame img {
+  width: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.timeline-frame.active {
+  border-color: rgba(255, 0, 102, 0.6);
+  background: rgba(255, 0, 102, 0.1);
+}
+
+.stage-panel {
+  height: 100%;
+}
+
+.stage-canvas {
+  margin-top: 1rem;
+  background: #05060d;
+  border-radius: 16px;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.stage-placeholder {
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.header-actions .status-chip {
+  min-width: 220px;
+  text-align: center;
+}
+
+@media (max-width: 1024px) {
+  .app-header {
+    flex-direction: column;
+  }
+
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
