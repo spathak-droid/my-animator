@@ -1,3 +1,5 @@
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import Button from '@mui/material/Button'
 import type { DrawingTool } from '../types'
 
 interface BrushRailProps {
@@ -9,6 +11,7 @@ interface BrushRailProps {
   onBrushSizeChange: (size: number) => void
   onBrushColorChange: (color: string) => void
   onToggleOnionSkin: () => void
+  onAutoTrace: () => void
 }
 
 const tools: { label: string; value: DrawingTool }[] = [
@@ -28,6 +31,7 @@ export function BrushRail({
   onBrushSizeChange,
   onBrushColorChange,
   onToggleOnionSkin,
+  onAutoTrace,
 }: BrushRailProps) {
   return (
     <div className="brush-rail">
@@ -59,6 +63,15 @@ export function BrushRail({
       <button className="rail-toggle" onClick={onToggleOnionSkin}>
         Onion skin: {onionSkin ? 'On' : 'Off'}
       </button>
+      <Button
+        variant="contained"
+        color="primary"
+        startIcon={<AutoAwesomeIcon />}
+        onClick={onAutoTrace}
+        sx={{ mt: 1, borderRadius: '12px', textTransform: 'none', fontWeight: 600 }}
+      >
+        Auto Trace
+      </Button>
     </div>
   )
 }

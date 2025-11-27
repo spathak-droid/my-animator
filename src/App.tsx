@@ -8,6 +8,7 @@ import { FrameTimeline } from './components/FrameTimeline'
 import { StageEditor } from './components/StageEditor'
 import { AppHeader } from './components/AppHeader'
 import { BrushRail } from './components/BrushRail'
+import { VideoFileInput, type VideoFileInputHandle } from './components/VideoFileInput'
 import { ProcessingOverlay } from './components/ProcessingOverlay'
 import { WorkspaceView } from './components/WorkspaceView'
 import { GettingStartedPanels } from './components/GettingStartedPanels'
@@ -130,6 +131,14 @@ function App() {
 
         setStatusMessage('Loading frames into canvas memory…')
         const frames = await composeFrames(files, ffmpegInstance)
+        frames.forEach((frame) => {
+          const videoLayer = {
+            ...createLayer('Video Layer 1'),
+            imageUrl: frame.imageUrl,
+            visible: true,
+          }
+          frame.layers = [videoLayer, ...frame.layers]
+        })
 
         setStatusMessage('Generating outlines (TensorFlow.js)…')
         for (const frame of frames) {
@@ -404,6 +413,7 @@ function App() {
   )
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const videoInputRef = useRef<VideoFileInputHandle | null>(null)
 
   const handleAddImageRequest = useCallback((scope: 'frame' | 'all') => {
     if (!fileInputRef.current) return
@@ -429,8 +439,67 @@ function App() {
   }, [applyImageToFrames])
 
   const handleAddVideo = useCallback(() => {
-    setStatusMessage('Add video coming soon')
+    videoInputRef.current?.open()
   }, [])
+
+  const handleAutoTrace = useCallback(async () => {
+    if (!activeFrame) {
+      setStatusMessage('Load or select a frame to Auto Trace')
+      return
+    }
+
+    const visibleImageLayer = activeFrame.layers.find((layer) => layer.visible && layer.imageUrl)
+    const fallbackImageLayer = activeFrame.layers.find((layer) => layer.imageUrl)
+    const sourceImageUrl = visibleImageLayer?.imageUrl ?? fallbackImageLayer?.imageUrl ?? activeFrame.imageUrl
+
+    if (!sourceImageUrl) {
+      setStatusMessage('Add an image layer or base frame to Auto Trace')
+      return
+    }
+
+    const targetFrameId = activeFrame.id
+
+    setIsProcessing(true)
+    setStatusMessage('Tracing outlines for current frame…')
+    try {
+      const outlineUrl = await generateOutlineMask(sourceImageUrl)
+      setProject((current) => {
+        if (!current) return current
+
+        const frameIndex = current.frames.findIndex((frame) => frame.id === targetFrameId)
+        if (frameIndex === -1) return current
+
+        const frame = current.frames[frameIndex]
+        const duplicateCount = frame.layers.filter((layer) => layer.name.startsWith('Auto Trace')).length
+        const outlineLayer = {
+          ...createLayer(`Auto Trace ${duplicateCount + 1}`),
+          imageUrl: outlineUrl,
+          visible: true,
+        }
+
+        const updatedFrame: FrameData = {
+          ...frame,
+          outlineUrl,
+          layers: [...frame.layers, outlineLayer],
+        }
+        const updatedFrames = current.frames.map((frame, idx) =>
+          idx === frameIndex ? updatedFrame : frame,
+        )
+        const updatedProject: AnimatorProject = {
+          frames: updatedFrames,
+          updatedAt: Date.now(),
+        }
+        void saveProject(updatedProject)
+        return updatedProject
+      })
+      setStatusMessage('Auto Trace applied to current frame')
+    } catch (error) {
+      console.error(error)
+      setStatusMessage('Auto Trace failed. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }, [activeFrame])
 
   const handleToggleLayerVisibility = useCallback((layerId: string) => {
     setProject((current) => {
@@ -580,14 +649,15 @@ function App() {
 
   const brushRail = (
     <BrushRail
-      tool={tool}
-      brushSize={brushSize}
       brushColor={brushColor}
+      brushSize={brushSize}
+      tool={tool}
       onionSkin={onionSkin}
       onToolChange={setTool}
       onBrushSizeChange={setBrushSize}
       onBrushColorChange={setBrushColor}
       onToggleOnionSkin={() => setOnionSkin((value) => !value)}
+      onAutoTrace={handleAutoTrace}
     />
   )
 
@@ -708,6 +778,7 @@ function App() {
         style={{ display: 'none' }}
         onChange={handleImageFileChange}
       />
+      <VideoFileInput ref={videoInputRef} onVideoSelected={handleVideoSelected} />
 
       {isClearConfirmVisible && (
         <div className="dialog-overlay">
