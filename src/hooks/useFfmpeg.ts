@@ -2,17 +2,15 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
-type FFmpegInstance = FFmpeg
-
 interface UseFfmpegResult {
-  ffmpeg: FFmpegInstance | null
+  ffmpeg: FFmpeg | null
   isReady: boolean
   isLoading: boolean
-  loadFfmpeg: () => Promise<FFmpegInstance>
+  loadFfmpeg: () => Promise<FFmpeg>
 }
 
 export function useFfmpeg(): UseFfmpegResult {
-  const ffmpegRef = useRef<FFmpegInstance | null>(null)
+  const ffmpegRef = useRef<FFmpeg | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -27,16 +25,18 @@ export function useFfmpeg(): UseFfmpegResult {
     }
 
     const ffmpeg = ffmpegRef.current
-    const baseURL = `${import.meta.env.BASE_URL ?? '/'}ffmpeg/umd`
+    const assetsBase = `${import.meta.env.BASE_URL ?? '/'}ffmpeg/esm`
+    const coreBase = `${assetsBase}/core`
 
     setIsLoading(true)
     try {
       await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        coreURL: await toBlobURL(`${coreBase}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.wasm`,
+          `${coreBase}/ffmpeg-core.wasm`,
           'application/wasm',
         ),
+        workerURL: await toBlobURL(`${assetsBase}/worker.js`, 'text/javascript'),
       })
       setIsReady(true)
     } finally {

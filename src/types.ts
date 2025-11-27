@@ -1,4 +1,4 @@
-export type DrawingTool = 'brush' | 'eraser'
+export type DrawingTool = 'pencil' | 'smooth' | 'highlight' | 'gradient' | 'eraser'
 
 export interface DrawingStroke {
   id: string
@@ -13,6 +13,7 @@ export interface DrawingLayer {
   name: string
   visible: boolean
   strokes: DrawingStroke[]
+  imageUrl?: string
 }
 
 export interface FrameData {

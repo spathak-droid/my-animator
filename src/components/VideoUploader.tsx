@@ -4,9 +4,16 @@ import type { ChangeEvent } from 'react'
 interface VideoUploaderProps {
   disabled?: boolean
   onVideoSelected: (file: File) => void
+  title?: string
+  description?: string
 }
 
-export function VideoUploader({ disabled, onVideoSelected }: VideoUploaderProps) {
+export function VideoUploader({
+  disabled,
+  onVideoSelected,
+  title = 'Upload reference video',
+  description = 'Supported formats: mp4, mov, webm. Processing stays entirely offline.',
+}: VideoUploaderProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -21,8 +28,8 @@ export function VideoUploader({ disabled, onVideoSelected }: VideoUploaderProps)
   return (
     <div className="panel">
       <div className="panel-header">
-        <h2>1. Upload reference video</h2>
-        <p>Supported formats: mp4, mov, webm. Processing stays entirely offline.</p>
+        <h2>{title}</h2>
+        <p>{description}</p>
       </div>
       <div className="panel-body upload-panel">
         <button
