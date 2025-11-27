@@ -8,12 +8,18 @@
     "devv": "npm run build && npm run dev",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@emotion/react": "^11.13.4",
+    "@emotion/styled": "^11.13.0",
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "@mui/icons-material": "^6.1.5",
+    "@mui/material": "^6.1.5",
     "@tensorflow/tfjs": "^4.22.0",
     "@types/uuid": "^10.0.0",
     "file-saver": "^2.0.5",
@@ -36,6 +42,7 @@
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
+    "gh-pages": "^6.1.1",
     "globals": "^16.5.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",

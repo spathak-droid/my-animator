@@ -182,6 +182,8 @@ export function StageEditor({
     'anonymous',
   )
 
+  const hasVisibleImageLayer = frame?.layers.some((layer) => layer.visible && layer.imageUrl)
+
   const baseWidth = frame?.width ?? 720
   const baseHeight = frame?.height ?? 405
   const stageWidth = Math.round(baseWidth * scale)
@@ -509,7 +511,7 @@ export function StageEditor({
                 <KonvaImage image={nextImage} listening={false} />
               </Layer>
             )}
-            {baseImage && (
+            {baseImage && !hasVisibleImageLayer && (
               <Layer listening={false}>
                 <KonvaImage image={baseImage} listening={false} />
               </Layer>
