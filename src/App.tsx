@@ -6,11 +6,16 @@ import './App.css'
 import { VideoUploader } from './components/VideoUploader'
 import { FrameTimeline } from './components/FrameTimeline'
 import { StageEditor } from './components/StageEditor'
+import { AppHeader } from './components/AppHeader'
+import { BrushRail } from './components/BrushRail'
+import { ProcessingOverlay } from './components/ProcessingOverlay'
+import { WorkspaceView } from './components/WorkspaceView'
+import { GettingStartedPanels } from './components/GettingStartedPanels'
 import { useFfmpeg, fetchFile } from './hooks/useFfmpeg'
-import { blobToDataUrl, loadImageElement } from './utils/imageHelpers'
+import { applyImageLayerToFrames, cloneVisibleImageLayers, createLayer } from './utils/project'
+import { composeFrames, createBlankCanvasFrame } from './utils/images'
 import { generateOutlineMask } from './utils/outline'
 import { clearProject, loadProject, saveProject } from './utils/storage'
-import type { FFmpeg } from '@ffmpeg/ffmpeg'
 import type {
   AnimatorProject,
   DrawingLayer,
@@ -18,25 +23,6 @@ import type {
   DrawingTool,
   FrameData,
 } from './types'
-
-const createLayer = (name: string): DrawingLayer => ({
-  id: uuidv4(),
-  name,
-  visible: true,
-  strokes: [],
-})
-
-const cloneVisibleImageLayers = (frames: FrameData[]) => {
-  const seen = new Map<string, DrawingLayer>()
-  frames.forEach((frame) => {
-    frame.layers.forEach((layer) => {
-      if (layer.imageUrl && !seen.has(layer.imageUrl)) {
-        seen.set(layer.imageUrl, layer)
-      }
-    })
-  })
-  return Array.from(seen.values())
-}
 
 function App() {
   const { loadFfmpeg, isLoading: isFfmpegLoading } = useFfmpeg()
@@ -110,33 +96,6 @@ function App() {
     activeFrameIndex >= 0 && project && activeFrameIndex < project.frames.length - 1
       ? project.frames[activeFrameIndex + 1]
       : null
-
-  const composeFrames = async (
-    names: string[],
-    ffmpegInstance: FFmpeg,
-  ): Promise<FrameData[]> => {
-    const frames: FrameData[] = []
-    for (const [index, name] of names.entries()) {
-      const frameFile = (await ffmpegInstance.readFile(name, 'binary')) as Uint8Array
-      const frameCopy = new Uint8Array(frameFile.length)
-      frameCopy.set(frameFile)
-      const blob = new Blob([frameCopy], { type: 'image/png' })
-      const imageUrl = await blobToDataUrl(blob)
-      const image = await loadImageElement(imageUrl)
-      const baseLayer = createLayer('Layer 1')
-      frames.push({
-        id: uuidv4(),
-        frameNumber: index,
-        imageUrl,
-        layers: [baseLayer],
-        activeLayerId: baseLayer.id,
-        width: image.width,
-        height: image.height,
-      })
-      await ffmpegInstance.deleteFile(name)
-    }
-    return frames
-  }
 
   const handleVideoSelected = useCallback(
     async (file: File) => {
@@ -429,35 +388,9 @@ function App() {
   const applyImageToFrames = useCallback(
     (dataUrl: string, scope: 'frame' | 'all') => {
       setProject((current) => {
-        if (!current) return current
-        if (!activeFrameId) return current
+        if (!current || !activeFrameId) return current
 
-        const updatedFrames = current.frames.map((frame) => {
-          const shouldEnable = scope === 'all' || frame.id === activeFrameId
-          let hasImageLayer = false
-          const updatedLayers = frame.layers.map((layer) => {
-            if (layer.imageUrl === dataUrl) {
-              hasImageLayer = true
-              return { ...layer, visible: shouldEnable }
-            }
-            return layer
-          })
-
-          if (hasImageLayer) {
-            return { ...frame, layers: updatedLayers }
-          }
-
-          const imageLayer: DrawingLayer = {
-            ...createLayer(`Image ${frame.layers.length + 1}`),
-            imageUrl: dataUrl,
-            visible: shouldEnable,
-          }
-          return {
-            ...frame,
-            layers: [...updatedLayers, imageLayer],
-          }
-        })
-
+        const updatedFrames = applyImageLayerToFrames(current.frames, activeFrameId, dataUrl, scope)
         const updatedProject: AnimatorProject = {
           frames: updatedFrames,
           updatedAt: Date.now(),
@@ -526,29 +459,7 @@ function App() {
     setIsProcessing(true)
     setStatusMessage('Creating blank canvas…')
     try {
-      const canvas = document.createElement('canvas')
-      canvas.width = 720
-      canvas.height = 405
-      const ctx = canvas.getContext('2d')
-      if (ctx) {
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
-        gradient.addColorStop(0, '#0f172a')
-        gradient.addColorStop(1, '#1a1f3b')
-        ctx.fillStyle = gradient
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-      }
-
-      const imageUrl = canvas.toDataURL('image/png')
-      const baseLayer = createLayer('Layer 1')
-      const frame: FrameData = {
-        id: uuidv4(),
-        frameNumber: 0,
-        imageUrl,
-        layers: [baseLayer],
-        activeLayerId: baseLayer.id,
-        width: canvas.width,
-        height: canvas.height,
-      }
+      const frame = createBlankCanvasFrame()
       const newProject: AnimatorProject = {
         frames: [frame],
         updatedAt: Date.now(),
@@ -668,207 +579,126 @@ function App() {
   const hasProject = Boolean(project?.frames.length)
 
   const brushRail = (
-    <div className="brush-rail">
-      <button
-        className={tool === 'pencil' ? 'active' : ''}
-        onClick={() => setTool('pencil')}
-      >
-        Pencil
-      </button>
-      <button
-        className={tool === 'smooth' ? 'active' : ''}
-        onClick={() => setTool('smooth')}
-      >
-        Smooth
-      </button>
-      <button
-        className={tool === 'highlight' ? 'active' : ''}
-        onClick={() => setTool('highlight')}
-      >
-        Highlight
-      </button>
-      <button
-        className={tool === 'gradient' ? 'active' : ''}
-        onClick={() => setTool('gradient')}
-      >
-        Gradient
-      </button>
-      <button
-        className={tool === 'eraser' ? 'active' : ''}
-        onClick={() => setTool('eraser')}
-      >
-        Eraser
-      </button>
-      <label className="rail-label" htmlFor="rail-brush-size">
-        Size
-      </label>
-      <input
-        id="rail-brush-size"
-        type="range"
-        min={1}
-        max={40}
-        value={brushSize}
-        onChange={(event) => setBrushSize(Number(event.target.value))}
+    <BrushRail
+      tool={tool}
+      brushSize={brushSize}
+      brushColor={brushColor}
+      onionSkin={onionSkin}
+      onToolChange={setTool}
+      onBrushSizeChange={setBrushSize}
+      onBrushColorChange={setBrushColor}
+      onToggleOnionSkin={() => setOnionSkin((value) => !value)}
+    />
+  )
+
+  const stageEditorWithTimeline = (
+    <StageEditor
+      frame={activeFrame}
+      prevFrame={onionSkin ? prevFrame : null}
+      nextFrame={onionSkin ? nextFrame : null}
+      brushColor={brushColor}
+      brushSize={brushSize}
+      tool={tool}
+      onionSkin={onionSkin}
+      onCommitStroke={handleCommitStroke}
+      onUndoStroke={handleUndoStroke}
+      onRedoStroke={handleRedoStroke}
+      canUndo={canUndo}
+      canRedo={canRedo}
+      onAddLayer={handleAddLayer}
+      onAddImage={handleAddImageRequest}
+      onAddVideo={handleAddVideo}
+      onToggleLayerVisibility={handleToggleLayerVisibility}
+      onSelectLayer={handleSelectLayer}
+      onDeleteLayer={handleDeleteLayer}
+      totalFrames={project?.frames.length ?? 0}
+    >
+      <FrameTimeline
+        layout="rail"
+        frames={project?.frames ?? []}
+        activeFrameId={activeFrameId}
+        onSelectFrame={setActiveFrameId}
+        onInsertFrame={handleInsertFrame}
+        onDeleteFrame={handleDeleteFrame}
       />
-      <label className="rail-label" htmlFor="rail-brush-color">
-        Color
-      </label>
-      <input
-        id="rail-brush-color"
-        type="color"
-        value={brushColor}
-        onChange={(event) => setBrushColor(event.target.value)}
-      />
-      <button className="rail-toggle" onClick={() => setOnionSkin((value) => !value)}>
-        Onion skin: {onionSkin ? 'On' : 'Off'}
-      </button>
-    </div>
+    </StageEditor>
+  )
+
+  const workspaceContent = (
+    <WorkspaceView
+      brushRail={brushRail}
+      stageContent={<div className="stage-wrapper panel full-stage">{stageEditorWithTimeline}</div>}
+    />
+  )
+
+  const gettingStartedStage = (
+    <StageEditor
+      frame={activeFrame}
+      prevFrame={onionSkin ? prevFrame : null}
+      nextFrame={onionSkin ? nextFrame : null}
+      brushColor={brushColor}
+      brushSize={brushSize}
+      tool={tool}
+      onionSkin={onionSkin}
+      onCommitStroke={handleCommitStroke}
+      onUndoStroke={handleUndoStroke}
+      onRedoStroke={handleRedoStroke}
+      canUndo={canUndo}
+      canRedo={canRedo}
+      onAddLayer={handleAddLayer}
+      onAddImage={handleAddImageRequest}
+      onAddVideo={handleAddVideo}
+      onToggleLayerVisibility={handleToggleLayerVisibility}
+      onSelectLayer={handleSelectLayer}
+      onDeleteLayer={handleDeleteLayer}
+    />
   )
 
   return (
     <div className="app-shell">
       {isRestoring && (
-        <div className="processing-overlay">
-          <div className="processing-modal">
-            <p className="eyebrow">Welcome back</p>
-            <h2>Restoring your previous project…</h2>
-            <div className="progress-header">
-              <span>Loading frames into memory</span>
-              <span>{restoreProgress}%</span>
-            </div>
-            <div className="progress-bar">
-              <div
-                className="progress-bar__fill"
-                style={{ width: `${restoreProgress}%` }}
-              />
-            </div>
-            <p className="lede status-line">Found saved project in IndexedDB</p>
-          </div>
-        </div>
+        <ProcessingOverlay
+          eyebrow="Welcome back"
+          title="Restoring your previous project…"
+          progressLabel="Loading frames into memory"
+          progressPercent={restoreProgress}
+          statusLine="Found saved project in IndexedDB"
+        />
       )}
 
       {isProcessing && (
-        <div className="processing-overlay">
-          <div className="processing-modal">
-            <p className="eyebrow">Processing reference video</p>
-            <h2>Building your frame workspace…</h2>
-            <div className="progress-header">
-              <span>{activeStepTitle}</span>
-              <span>{progressPercent}%</span>
-            </div>
-            <div className="progress-bar">
-              <div
-                className="progress-bar__fill"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            <p className="lede status-line">{statusMessage}</p>
-          </div>
-        </div>
+        <ProcessingOverlay
+          eyebrow="Processing reference video"
+          title="Building your frame workspace…"
+          progressLabel={activeStepTitle}
+          progressPercent={progressPercent}
+          statusLine={statusMessage}
+        />
       )}
 
-      <header className="app-header">
-        <div>
-          <p className="eyebrow">Flipaclip-style web animator</p>
-          <h1>Trace, stylize, and animate fully in the browser.</h1>
-          <p className="lede">
-            Import a reference video, auto-generate outlines with TensorFlow.js, draw in layers,
-            and manage a 12 FPS timeline using Konva.
-          </p>
-        </div>
-        <div className="header-actions">
-          <button className="ghost" onClick={requestClearProject} disabled={!project}>
-            Clear project
-          </button>
-          <span className={`status-chip ${isBusy ? 'busy' : ''}`}>{statusMessage}</span>
-        </div>
-      </header>
+      <AppHeader
+        statusMessage={statusMessage}
+        isBusy={isBusy}
+        canClearProject={Boolean(project)}
+        onClearProject={requestClearProject}
+      />
 
       {hasProject ? (
-        <div className="workspace-full">
-          {brushRail}
-          <div className="canvas-stack">
-            <div className="stage-wrapper panel full-stage">
-              <StageEditor
-                frame={activeFrame}
-                prevFrame={onionSkin ? prevFrame : null}
-                nextFrame={onionSkin ? nextFrame : null}
-                brushColor={brushColor}
-                brushSize={brushSize}
-                tool={tool}
-                onionSkin={onionSkin}
-                onCommitStroke={handleCommitStroke}
-                onUndoStroke={handleUndoStroke}
-                onRedoStroke={handleRedoStroke}
-                canUndo={canUndo}
-                canRedo={canRedo}
-                onAddLayer={handleAddLayer}
-                onAddImage={handleAddImageRequest}
-                onAddVideo={handleAddVideo}
-                onToggleLayerVisibility={handleToggleLayerVisibility}
-                onSelectLayer={handleSelectLayer}
-                onDeleteLayer={handleDeleteLayer}
-                totalFrames={project?.frames.length ?? 0}
-              >
-                <FrameTimeline
-                  layout="rail"
-                  frames={project?.frames ?? []}
-                  activeFrameId={activeFrameId}
-                  onSelectFrame={setActiveFrameId}
-                  onInsertFrame={handleInsertFrame}
-                  onDeleteFrame={handleDeleteFrame}
-                />
-              </StageEditor>
-            </div>
-          </div>
-        </div>
+        workspaceContent
       ) : (
-        <main className="main-grid">
-          <section className="left-column">
-            <div className="panel">
-              <div className="panel-header">
-                <h2>1. Open a blank canvas</h2>
-                <p>Start sketching immediately with a fresh 720×405 stage.</p>
-              </div>
-              <div className="panel-body intro-panel">
-                <button className="primary" onClick={handleCreateBlankCanvas} disabled={isBusy}>
-                  {isBusy ? 'Preparing…' : 'Launch canvas'}
-                </button>
-                <p className="subtext">You can import video layers later for tracing.</p>
-              </div>
-            </div>
-
+        <GettingStartedPanels
+          isBusy={isBusy}
+          onCreateBlankCanvas={handleCreateBlankCanvas}
+          videoUploader={
             <VideoUploader
               disabled={isBusy}
               onVideoSelected={handleVideoSelected}
               title="2. Add a reference video"
               description="Drop in MOV, MP4, or WebM footage to extract 12 FPS frames locally."
             />
-          </section>
-
-          <section className="right-column">
-            <StageEditor
-              frame={activeFrame}
-              prevFrame={onionSkin ? prevFrame : null}
-              nextFrame={onionSkin ? nextFrame : null}
-              brushColor={brushColor}
-              brushSize={brushSize}
-              tool={tool}
-              onionSkin={onionSkin}
-              onCommitStroke={handleCommitStroke}
-              onUndoStroke={handleUndoStroke}
-              onRedoStroke={handleRedoStroke}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              onAddLayer={handleAddLayer}
-              onAddImage={handleAddImageRequest}
-              onAddVideo={handleAddVideo}
-              onToggleLayerVisibility={handleToggleLayerVisibility}
-              onSelectLayer={handleSelectLayer}
-              onDeleteLayer={handleDeleteLayer}
-            />
-          </section>
-        </main>
+          }
+          stagePreview={gettingStartedStage}
+        />
       )}
 
       <input
