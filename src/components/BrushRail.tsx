@@ -60,9 +60,14 @@ export function BrushRail({
         value={brushColor}
         onChange={(event) => onBrushColorChange(event.target.value)}
       />
-      <button className="rail-toggle" onClick={onToggleOnionSkin}>
-        Onion skin: {onionSkin ? 'On' : 'Off'}
-      </button>
+      <div className="onion-skin-toggle">
+        <label className="toggle-label">
+          <span>Onion</span>
+          <div className="toggle-switch" onClick={onToggleOnionSkin}>
+            <div className={`toggle-slider ${onionSkin ? 'active' : ''}`}></div>
+          </div>
+        </label>
+      </div>
       <Button
         variant="contained"
         color="primary"

@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Stage, Layer, Line, Image as KonvaImage } from 'react-konva'
 import useImage from 'use-image'
 import type { KonvaEventObject } from 'konva/lib/Node'
@@ -6,23 +6,58 @@ import { v4 as uuidv4 } from 'uuid'
 import type { DrawingStroke, DrawingTool, FrameData } from '../types'
 import { adjustHexBrightness, hexToRgba } from '../utils/color'
 
-function ImageLayerNode({ imageUrl }: { imageUrl?: string }) {
-  const [image] = useImage(imageUrl ?? '', 'anonymous')
-  if (!image) return null
-  return <KonvaImage image={image} listening={false} />
+// Global image cache to prevent reloading
+const imageCache = new Map<string, HTMLImageElement>()
+
+// Preload images for smooth playback
+export function preloadImages(urls: string[]) {
+  urls.forEach(url => {
+    if (url && !imageCache.has(url)) {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.src = url
+      img.onload = () => {
+        imageCache.set(url, img)
+      }
+    }
+  })
 }
+
+const PROTECTED_LAYER_NAME = 'layer 1'
+
+const isProtectedLayer = (name?: string) => (name ?? '').trim().toLowerCase() === PROTECTED_LAYER_NAME
+
+const ImageLayerNode = memo(function ImageLayerNode({ imageUrl }: { imageUrl?: string }) {
+  const [image] = useImage(imageUrl ?? '', 'anonymous')
+  
+  // Try cached image first for instant display
+  const cachedImage = imageUrl ? imageCache.get(imageUrl) : null
+  const displayImage = cachedImage || image
+  
+  // Cache the image once loaded
+  useEffect(() => {
+    if (image && imageUrl && !imageCache.has(imageUrl)) {
+      imageCache.set(imageUrl, image)
+    }
+  }, [image, imageUrl])
+  
+  if (!displayImage) return null
+  return <KonvaImage image={displayImage} listening={false} />
+})
 
 interface StageEditorProps {
   frame: FrameData | null
   prevFrame?: FrameData | null
-  nextFrame?: FrameData | null
   tool: DrawingTool
   brushColor: string
   brushSize: number
   onionSkin: boolean
   onCommitStroke: (frameId: string, layerId: string, stroke: DrawingStroke) => void
+  onGenerateMovie?: () => void
   children?: ReactNode
   totalFrames?: number
+  projectName?: string
+  onProjectNameChange?: (name: string) => void
   onUndoStroke?: () => void
   onRedoStroke?: () => void
   canUndo?: boolean
@@ -32,7 +67,8 @@ interface StageEditorProps {
   onAddVideo?: () => void
   onToggleLayerVisibility?: (layerId: string) => void
   onSelectLayer?: (layerId: string) => void
-  onDeleteLayer?: (layerId: string) => void
+  onDeleteLayer?: (layerId: string, scope?: 'frame' | 'all', layerName?: string) => void
+  onClearFrame?: () => void
 }
 
 const VisibilityIcon = () => (
@@ -142,14 +178,16 @@ const getLineAppearance = (stroke: DrawingStroke): LineAppearance => {
 export function StageEditor({
   frame,
   prevFrame,
-  nextFrame,
-  children,
   tool,
   brushColor,
   brushSize,
   onionSkin,
   onCommitStroke,
+  onGenerateMovie,
+  children,
   totalFrames = 0,
+  projectName = 'Untitled project',
+  onProjectNameChange,
   onUndoStroke,
   onRedoStroke,
   canUndo = false,
@@ -160,8 +198,10 @@ export function StageEditor({
   onToggleLayerVisibility,
   onSelectLayer,
   onDeleteLayer,
+  onClearFrame,
 }: StageEditorProps) {
   const [draftStroke, setDraftStroke] = useState<DrawingStroke | null>(null)
+  const draftStrokeRef = useRef<DrawingStroke | null>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null)
   const [scale, setScale] = useState(1.4)
@@ -170,19 +210,12 @@ export function StageEditor({
   const layerPanelRef = useRef<HTMLDivElement | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLayerPanelOpen, setIsLayerPanelOpen] = useState(false)
+  const [isDeleteLayersOpen, setIsDeleteLayersOpen] = useState(false)
+  const [deleteScope, setDeleteScope] = useState<'frame' | 'all'>('frame')
+  const [layersToDelete, setLayersToDelete] = useState<Set<string>>(new Set())
 
   const [baseImage] = useImage(frame?.imageUrl ?? '', 'anonymous')
   const [outlineImage] = useImage(frame?.outlineUrl ?? '', 'anonymous')
-  const [prevImage] = useImage(
-    onionSkin && prevFrame ? prevFrame.imageUrl : '',
-    'anonymous',
-  )
-  const [nextImage] = useImage(
-    onionSkin && nextFrame ? nextFrame.imageUrl : '',
-    'anonymous',
-  )
-
-  const hasVisibleImageLayer = frame?.layers.some((layer) => layer.visible && layer.imageUrl)
 
   const baseWidth = frame?.width ?? 720
   const baseHeight = frame?.height ?? 405
@@ -235,13 +268,15 @@ export function StageEditor({
       const x = pointer.x / scale
       const y = pointer.y / scale
       setIsDrawing(true)
-      setDraftStroke({
+      const nextStroke: DrawingStroke = {
         id: uuidv4(),
         points: [x, y],
         color: brushColor,
         size: brushSize,
         mode: tool,
-      })
+      }
+      draftStrokeRef.current = nextStroke
+      setDraftStroke(nextStroke)
     },
     [frame, brushColor, brushSize, tool, scale, updatePointerPosition],
   )
@@ -256,10 +291,12 @@ export function StageEditor({
       const y = pointer.y / scale
       setDraftStroke((current) => {
         if (!current) return current
-        return {
+        const updatedStroke = {
           ...current,
           points: [...current.points, x, y],
         }
+        draftStrokeRef.current = updatedStroke
+        return updatedStroke
       })
     },
     [isDrawing, scale, updatePointerPosition],
@@ -268,13 +305,17 @@ export function StageEditor({
   const finishStroke = useCallback(() => {
     if (!frame) return
     setIsDrawing(false)
-    setDraftStroke((current) => {
-      if (current && current.points.length > 2) {
-        // Defer the commit to avoid setState during render
-        setTimeout(() => onCommitStroke(frame.id, frame.activeLayerId, current), 0)
+    const stroke = draftStrokeRef.current
+    draftStrokeRef.current = null
+    setDraftStroke(null)
+    if (stroke && stroke.points.length > 2) {
+      const commit = () => onCommitStroke(frame.id, frame.activeLayerId, stroke)
+      if (typeof window !== 'undefined' && 'requestAnimationFrame' in window) {
+        window.requestAnimationFrame(commit)
+      } else {
+        setTimeout(commit, 0)
       }
-      return null
-    })
+    }
   }, [frame, onCommitStroke])
 
   const handlePointerLeave = useCallback(() => {
@@ -384,6 +425,40 @@ export function StageEditor({
     setIsLayerPanelOpen((value) => !value)
   }, [])
 
+  const openDeleteLayersDialog = useCallback(() => {
+    setLayersToDelete(new Set())
+    setDeleteScope('frame')
+    setIsDeleteLayersOpen(true)
+    setIsMenuOpen(false)
+  }, [])
+
+  const toggleLayerForDeletion = useCallback((layerId: string, layerName?: string) => {
+    if (isProtectedLayer(layerName)) return
+    setLayersToDelete((prev) => {
+      const next = new Set(prev)
+      if (next.has(layerId)) {
+        next.delete(layerId)
+      } else {
+        next.add(layerId)
+      }
+      return next
+    })
+  }, [])
+
+  const executeDeleteLayers = useCallback(() => {
+    if (!onDeleteLayer || layersToDelete.size === 0 || !frame) return
+
+    const targets = frame.layers.filter(layer => layersToDelete.has(layer.id) && !isProtectedLayer(layer.name))
+    if (!targets.length) return
+
+    targets.forEach((layer) => {
+      onDeleteLayer(layer.id, deleteScope, layer.name)
+    })
+
+    setIsDeleteLayersOpen(false)
+    setLayersToDelete(new Set())
+  }, [onDeleteLayer, layersToDelete, deleteScope, frame])
+
   useEffect(() => {
     if (!isMenuOpen) return
     const handleClickOutside = (event: MouseEvent) => {
@@ -422,12 +497,40 @@ export function StageEditor({
     <div className="stage-panel">
       <div className="panel-header">
         <div>
-          <h2>Drawing workspace</h2>
+          <input
+            type="text"
+            className="project-name-input"
+            value={projectName}
+            onChange={(e) => onProjectNameChange?.(e.target.value)}
+            placeholder="Untitled project"
+          />
           <p>
             Frame {frame.frameNumber + 1} • Canvas {frame.width} × {frame.height}px
           </p>
         </div>
-        <span className="frame-count">{totalFrames} frames</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            type="button"
+            className="stage-toolbar__btn"
+            onClick={() => {
+              console.log('Download button clicked')
+              if (onGenerateMovie) {
+                console.log('Calling onGenerateMovie')
+                onGenerateMovie()
+              } else {
+                console.log('onGenerateMovie is not defined')
+              }
+            }}
+            style={{ color: '#ff6b35' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7,10 12,15 17,10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </button>
+          <span className="frame-count">{totalFrames} frames</span>
+        </div>
       </div>
       <div className="stage-canvas">
         <div
@@ -484,6 +587,20 @@ export function StageEditor({
                 >
                   Add video
                 </button>
+                <button
+                  type="button"
+                  className="stage-menu__item"
+                  onClick={openDeleteLayersDialog}
+                >
+                  Remove layers
+                </button>
+                <button
+                  type="button"
+                  className="stage-menu__item danger"
+                  onClick={() => handleMenuAction(onClearFrame)}
+                >
+                  Clear frame
+                </button>
               </div>
             )}
           </div>
@@ -501,17 +618,8 @@ export function StageEditor({
             onTouchMove={handlePointerMove}
             onTouchEnd={handlePointerLeave}
           >
-            {onionSkin && prevImage && (
-              <Layer opacity={0.15} listening={false}>
-                <KonvaImage image={prevImage} listening={false} />
-              </Layer>
-            )}
-            {onionSkin && nextImage && (
-              <Layer opacity={0.15} listening={false}>
-                <KonvaImage image={nextImage} listening={false} />
-              </Layer>
-            )}
-            {baseImage && !hasVisibleImageLayer && (
+            {/* Always show base image (background) if it exists */}
+            {baseImage && (
               <Layer listening={false}>
                 <KonvaImage image={baseImage} listening={false} />
               </Layer>
@@ -532,6 +640,31 @@ export function StageEditor({
               <Layer listening={false}>
                 {strokes.map((stroke) => renderStrokeLine(stroke, stroke.uniqueKey))}
                 {draftStroke ? renderStrokeLine(draftStroke, 'draft-stroke') : null}
+              </Layer>
+            )}
+            {/* Onion skin layer - show previous frame content at 40% opacity */}
+            {onionSkin && prevFrame && (
+              <Layer opacity={0.2} listening={false}>
+                {/* Show previous frame background image */}
+                {(() => {
+                  const visibleImageLayer = prevFrame.layers.find(layer => layer.visible && layer.imageUrl)
+                  const imageUrl = visibleImageLayer?.imageUrl || prevFrame.imageUrl
+                  return imageUrl && <ImageLayerNode imageUrl={imageUrl} />
+                })()}
+                {/* Show previous frame strokes */}
+                {prevFrame.layers.filter(layer => layer.visible).map((layer, layerIndex) => (
+                  layer.strokes.filter(stroke => stroke.mode !== 'eraser').map((stroke, strokeIndex) => (
+                    <Line
+                      key={`onion-stroke-${layer.id}-${layerIndex}-${stroke.id}-${strokeIndex}`}
+                      points={stroke.points}
+                      stroke={stroke.color}
+                      strokeWidth={stroke.size}
+                      lineCap="round"
+                      lineJoin="round"
+                      listening={false}
+                    />
+                  ))
+                ))}
               </Layer>
             )}
           </Stage>
@@ -558,43 +691,54 @@ export function StageEditor({
                   </button>
                 </div>
                 <div className="layer-panel__list">
-                  {frame.layers.map((layer) => (
-                    <div
-                      key={layer.id}
-                      className={`layer-row ${layer.id === frame.activeLayerId ? 'active' : ''}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => onSelectLayer?.(layer.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault()
-                          onSelectLayer?.(layer.id)
-                        }
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className={`layer-eye ${layer.visible ? 'on' : 'off'}`}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          onToggleLayerVisibility?.(layer.id)
+                  {frame.layers.map((layer) => {
+                    const locked = isProtectedLayer(layer.name)
+                    const rowClasses = [
+                      'layer-row',
+                      layer.id === frame.activeLayerId ? 'active' : '',
+                      locked ? 'layer-row--locked' : '',
+                    ].filter(Boolean).join(' ')
+
+                    return (
+                      <div
+                        key={layer.id}
+                        className={rowClasses}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onSelectLayer?.(layer.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            onSelectLayer?.(layer.id)
+                          }
                         }}
                       >
-                        {layer.visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
-                      </button>
-                      <span className="layer-name">{layer.name}</span>
-                      <button
-                        type="button"
-                        className="layer-delete"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          onDeleteLayer?.(layer.id)
-                        }}
-                      >
-                        <DeleteIcon />
-                      </button>
-                    </div>
-                  ))}
+                        <button
+                          type="button"
+                          className={`layer-eye ${layer.visible ? 'on' : 'off'}`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            onToggleLayerVisibility?.(layer.id)
+                          }}
+                        >
+                          {layer.visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
+                        </button>
+                        <span className="layer-name">{layer.name}</span>
+                        <button
+                          type="button"
+                          className={`layer-delete${locked ? ' layer-delete--disabled' : ''}`}
+                          disabled={locked}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            if (locked) return
+                            onDeleteLayer?.(layer.id, 'frame', layer.name)
+                          }}
+                        >
+                          <DeleteIcon />
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -615,6 +759,84 @@ export function StageEditor({
           )}
         </div>
       </div>
+
+      {/* Delete Layers Dialog */}
+      {isDeleteLayersOpen && (
+        <div className="dialog-overlay">
+          <div className="confirm-dialog" style={{ maxWidth: '450px' }}>
+            <h2>Remove Layers</h2>
+            <div className="delete-scope-toggle">
+              <label>
+                <input
+                  type="radio"
+                  value="frame"
+                  checked={deleteScope === 'frame'}
+                  onChange={() => setDeleteScope('frame')}
+                />
+                This frame only
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  value="all"
+                  checked={deleteScope === 'all'}
+                  onChange={() => setDeleteScope('all')}
+                />
+                All frames
+              </label>
+            </div>
+            <div className="layers-list" style={{ maxHeight: '250px', overflowY: 'auto', margin: '1rem 0' }}>
+              {frame?.layers.map((layer) => {
+                const isSelected = layersToDelete.has(layer.id)
+                const locked = isProtectedLayer(layer.name)
+                return (
+                  <button
+                    key={layer.id}
+                    type="button"
+                    className={`layer-chip ${isSelected ? 'layer-chip--selected' : ''} ${locked ? 'layer-chip--locked' : ''}`.trim()}
+                    onClick={() => {
+                      if (locked) return
+                      toggleLayerForDeletion(layer.id, layer.name)
+                    }}
+                    disabled={locked}
+                  >
+                    <span className="layer-chip__indicator" aria-hidden="true" />
+                    <span className="layer-chip__text">
+                      {layer.name || 'Layer'}
+                      {!layer.visible && <span className="layer-chip__status">hidden</span>}
+                    </span>
+                    <span className="layer-chip__action">
+                      {locked ? 'Locked' : isSelected ? 'Remove' : 'Keep'}
+                    </span>
+                  </button>
+                )
+              })}
+              {(!frame?.layers || frame.layers.length === 0) && (
+                <p style={{ opacity: 0.6 }}>No layers to manage</p>
+              )}
+            </div>
+            <div className="dialog-actions">
+              <button 
+                className="btn-secondary" 
+                onClick={() => {
+                  setIsDeleteLayersOpen(false)
+                  setLayersToDelete(new Set())
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-primary danger" 
+                onClick={executeDeleteLayers}
+                disabled={layersToDelete.size === 0}
+              >
+                Delete {layersToDelete.size} layer{layersToDelete.size !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {children}
     </div>
   )

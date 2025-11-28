@@ -29,7 +29,10 @@ export interface FrameData {
 }
 
 export interface AnimatorProject {
+  name?: string
+  backgroundColor?: string
   frames: FrameData[]
+  audioUrl?: string  // Extracted audio from video as data URL
   updatedAt: number
 }
 

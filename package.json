@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist -b gh-pages-temp"
   },
   "dependencies": {
     "@emotion/react": "^11.13.4",
@@ -18,8 +18,10 @@
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "@mediapipe/selfie_segmentation": "^0.1.1675465747",
     "@mui/icons-material": "^6.1.5",
     "@mui/material": "^6.1.5",
+    "@tensorflow-models/body-segmentation": "^1.0.2",
     "@tensorflow/tfjs": "^4.22.0",
     "@types/uuid": "^10.0.0",
     "file-saver": "^2.0.5",

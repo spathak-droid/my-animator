@@ -87,6 +87,26 @@
 .processing-steps li.done .step-dot {
   background: rgba(255, 255, 255, 0.4);
 }
+
+.cancel-button {
+  margin-top: 1.5rem;
+  padding: 0.625rem 1.5rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancel-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
 #root {
   min-height: 100vh;
   background: radial-gradient(circle at top, #1b1f32, #0f111c 55%);
@@ -339,6 +359,28 @@
   font-size: 0.95rem;
 }
 
+.project-name-input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  width: 100%;
+  max-width: 400px;
+}
+
+.project-name-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.project-name-input:focus {
+  color: #fff;
+}
+
 .frame-count {
   background: linear-gradient(120deg, #ff0066, #ff8a00);
   padding: 0.35rem 0.75rem;
@@ -445,6 +487,49 @@ input[type='range'] {
   background: transparent;
   border: none;
   box-shadow: none;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Play/Pause button */
+.timeline-play-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #ff0066, #ff4488);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 2px 8px rgba(255, 0, 102, 0.3);
+}
+
+.timeline-play-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 16px rgba(255, 0, 102, 0.4);
+}
+
+.timeline-play-btn:active {
+  transform: scale(0.95);
+}
+
+.timeline-play-btn.playing {
+  background: linear-gradient(135deg, #ff4488, #ff6699);
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(255, 0, 102, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(255, 0, 102, 0.6);
+  }
 }
 
 .timeline-strip.rail {
@@ -917,14 +1002,119 @@ input[type='range'] {
   gap: 0.75rem;
 }
 
+.dialog-actions button {
+  padding: 0.6rem 1.2rem;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dialog-actions .btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.dialog-actions .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.dialog-actions .btn-primary {
+  background: linear-gradient(120deg, #ff0066, #ff8a00);
+  border: none;
+  color: #fff;
+  box-shadow: 0 10px 25px rgba(255, 0, 102, 0.35);
+}
+
+.dialog-actions .btn-primary:hover {
+  box-shadow: 0 12px 30px rgba(255, 0, 102, 0.45);
+  transform: translateY(-1px);
+}
+
 .dialog-actions .danger {
   background: linear-gradient(120deg, #ff3b3b, #ff6f6f);
   border: none;
   color: #fff;
-  padding: 0.6rem 1.2rem;
-  border-radius: 12px;
-  font-weight: 600;
   box-shadow: 0 10px 25px rgba(255, 59, 59, 0.35);
+}
+
+.color-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.color-option {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.color-option:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.color-option.gradient {
+  border: none;
+}
+
+.color-option.gradient:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.onion-skin-toggle {
+  margin-top: 1rem;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  transition: background 0.3s ease;
+  cursor: pointer;
+}
+
+.toggle-switch:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-slider.active {
+  transform: translateX(20px);
+  background: linear-gradient(120deg, #ff0066, #ff8a00);
 }
 
 .stage-placeholder {
@@ -935,6 +1125,159 @@ input[type='range'] {
 .header-actions .status-chip {
   min-width: 220px;
   text-align: center;
+}
+
+/* Delete Layers Dialog */
+.delete-scope-toggle {
+  display: flex;
+  gap: 1.5rem;
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.delete-scope-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.delete-scope-toggle input[type="radio"] {
+  accent-color: #ff0066;
+}
+
+.layers-list {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.layer-chip {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.layer-chip:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.layer-chip--selected {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 0, 102, 0.12);
+}
+
+.layer-chip__indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(120deg, #ff0066, #ff8a00);
+  box-shadow: 0 0 8px rgba(255, 0, 102, 0.4);
+}
+
+.layer-chip--selected .layer-chip__indicator {
+  background: #fff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+}
+
+.layer-chip__text {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layer-chip__status {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+}
+
+.layer-chip__action {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.layer-chip--selected .layer-chip__action {
+  color: #ffb347;
+}
+
+/* Dialog Actions Button Styling */
+.dialog-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+.dialog-actions button {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 80px;
+}
+
+.dialog-actions .btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dialog-actions .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.dialog-actions .btn-primary {
+  background: linear-gradient(120deg, #ff0066, #ff8a00);
+  color: #fff;
+  border: 1px solid transparent;
+}
+
+.dialog-actions .btn-primary:hover:not(:disabled) {
+  background: linear-gradient(120deg, #ff1a75, #ff9a1a);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 0, 102, 0.3);
+}
+
+.dialog-actions .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.dialog-actions .btn-primary.danger {
+  background: #ff4d4f;
+  border-color: #ff4d4f;
+}
+
+.dialog-actions .btn-primary.danger:hover:not(:disabled) {
+  background: #ff7875;
+  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.3);
 }
 
 @media (max-width: 1200px) {

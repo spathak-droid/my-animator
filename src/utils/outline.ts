@@ -81,8 +81,13 @@ export const generateOutlineMask = async (imageUrl: string): Promise<string> => 
   })
 
   const rgba = tf.tidy(() => {
-    const alpha = outlineTensor.mul(0.95)
-    return tf.stack([alpha, alpha, alpha, alpha], 2) as Tensor3D
+    // Always use white background with black outlines
+    const whiteBackground = tf.fill(outlineTensor.shape, 1) // RGB = 1,1,1 = white
+    
+    // Create black outlines (invert the outline tensor)
+    const blackOutlines = tf.sub(tf.scalar(1), outlineTensor.mul(0.95))
+    
+    return tf.stack([whiteBackground, whiteBackground, whiteBackground, blackOutlines], 2) as Tensor3D
   })
 
   const pixelData = await tf.browser.toPixels(rgba)

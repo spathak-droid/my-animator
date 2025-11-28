@@ -35,17 +35,54 @@ export const composeFrames = async (
   return frames
 }
 
-export const createBlankCanvasFrame = () => {
+export const createBackgroundImage = (
+  backgroundColor: string = '#0f172a',
+  width: number = 720,
+  height: number = 405
+): string => {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+
+  if (ctx) {
+    // Check if it's a gradient (contains comma) or solid color
+    if (backgroundColor.includes(',')) {
+      // Parse gradient colors
+      const colors = backgroundColor.split(',')
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
+      colors.forEach((color, index) => {
+        gradient.addColorStop(index / (colors.length - 1), color.trim())
+      })
+      ctx.fillStyle = gradient
+    } else {
+      ctx.fillStyle = backgroundColor
+    }
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+  }
+
+  return canvas.toDataURL('image/png')
+}
+
+export const createBlankCanvasFrame = (backgroundColor: string = '#0f172a') => {
   const canvas = document.createElement('canvas')
   canvas.width = 720
   canvas.height = 405
   const ctx = canvas.getContext('2d')
 
   if (ctx) {
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
-    gradient.addColorStop(0, '#0f172a')
-    gradient.addColorStop(1, '#1a1f3b')
-    ctx.fillStyle = gradient
+    // Check if it's a gradient (contains comma) or solid color
+    if (backgroundColor.includes(',')) {
+      // Parse gradient colors
+      const colors = backgroundColor.split(',')
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
+      colors.forEach((color, index) => {
+        gradient.addColorStop(index / (colors.length - 1), color.trim())
+      })
+      ctx.fillStyle = gradient
+    } else {
+      ctx.fillStyle = backgroundColor
+    }
     ctx.fillRect(0, 0, canvas.width, canvas.height)
   }
 

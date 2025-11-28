@@ -4,6 +4,7 @@ interface ProcessingOverlayProps {
   progressLabel: string
   progressPercent: number
   statusLine: string
+  onCancel?: () => void
 }
 
 export function ProcessingOverlay({
@@ -12,6 +13,7 @@ export function ProcessingOverlay({
   progressLabel,
   progressPercent,
   statusLine,
+  onCancel,
 }: ProcessingOverlayProps) {
   const clampedPercent = Math.max(0, Math.min(100, Math.round(progressPercent)))
 
@@ -28,6 +30,11 @@ export function ProcessingOverlay({
           <div className="progress-bar__fill" style={{ width: `${clampedPercent}%` }} />
         </div>
         <p className="lede status-line">{statusLine}</p>
+        {onCancel && (
+          <button className="cancel-button" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
       </div>
     </div>
   )
