@@ -18,6 +18,7 @@ import { applyImageLayerToFrames, cloneVisibleImageLayers, createLayer } from '.
 import { composeFrames, createBlankCanvasFrame, createBackgroundImage } from './utils/images'
 import { loadImageElement } from './utils/imageHelpers'
 import { generateOutlineMask } from './utils/outline'
+import logo from './assets/logo.png'
 import { clearProject, loadProject, saveProject } from './utils/storage'
 import type {
   AnimatorProject,
@@ -37,6 +38,7 @@ function App() {
   const [brushColor, setBrushColor] = useState('#ff0066')
   const [brushSize, setBrushSize] = useState(6)
   const [onionSkin, setOnionSkin] = useState(true)
+  const [isStageFullscreen, setIsStageFullscreen] = useState(false)
 
   const [isRestoring, setIsRestoring] = useState(false)
   const [restoreProgress, setRestoreProgress] = useState(0)
@@ -47,6 +49,20 @@ function App() {
   const [backgroundColorPrompt, setBackgroundColorPrompt] = useState(false)
   const [showMovieGenerator, setShowMovieGenerator] = useState(false)
   const autoTraceCancelledRef = useRef(false)
+
+  useEffect(() => {
+    const updateFavicon = () => {
+      let favicon = document.querySelector("link[rel*='icon']") as HTMLLinkElement | null
+      if (!favicon) {
+        favicon = document.createElement('link')
+        favicon.rel = 'icon'
+        document.head.appendChild(favicon)
+      }
+      favicon.href = logo
+      favicon.type = 'image/png'
+    }
+    updateFavicon()
+  }, [])
 
   useEffect(() => {
     console.log('showMovieGenerator changed to:', showMovieGenerator)
@@ -1059,7 +1075,25 @@ function App() {
   )
   const activeStepTitle = processingSteps[activeProcessingIndex]?.label ?? statusMessage
 
-  const hasProject = Boolean(project?.frames.length)
+    const hasProject = Boolean(project?.frames.length)
+
+  useEffect(() => {
+    if (!hasProject && isStageFullscreen) {
+      setIsStageFullscreen(false)
+    }
+  }, [hasProject, isStageFullscreen])
+
+  useEffect(() => {
+    const className = 'app-fullscreen'
+    document.body.classList.toggle(className, isStageFullscreen)
+    return () => {
+      document.body.classList.remove(className)
+    }
+  }, [isStageFullscreen])
+
+  const handleToggleFullscreen = useCallback(() => {
+    setIsStageFullscreen((value) => !value)
+  }, [])
 
   const brushRail = (
     <BrushRail
@@ -1098,6 +1132,9 @@ function App() {
       totalFrames={project?.frames.length ?? 0}
       projectName={project?.name ?? 'Untitled project'}
       onProjectNameChange={handleProjectNameChange}
+      toolPanel={brushRail}
+      isFullscreen={isStageFullscreen}
+      onToggleFullscreen={handleToggleFullscreen}
       onClearFrame={handleClearFrame}
     >
       <FrameTimeline
@@ -1115,7 +1152,7 @@ function App() {
 
   const workspaceContent = (
     <WorkspaceView
-      brushRail={brushRail}
+      brushRail={isStageFullscreen ? null : brushRail}
       stageContent={<div className="stage-wrapper panel full-stage">{stageEditorWithTimeline}</div>}
     />
   )

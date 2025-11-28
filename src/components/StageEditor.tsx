@@ -1,5 +1,5 @@
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Stage, Layer, Line, Image as KonvaImage } from 'react-konva'
+import { Stage, Layer, Line, Image as KonvaImage, Group } from 'react-konva'
 import useImage from 'use-image'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import { v4 as uuidv4 } from 'uuid'
@@ -58,6 +58,9 @@ interface StageEditorProps {
   totalFrames?: number
   projectName?: string
   onProjectNameChange?: (name: string) => void
+  toolPanel?: ReactNode
+  isFullscreen?: boolean
+  onToggleFullscreen?: () => void
   onUndoStroke?: () => void
   onRedoStroke?: () => void
   canUndo?: boolean
@@ -188,6 +191,9 @@ export function StageEditor({
   totalFrames = 0,
   projectName = 'Untitled project',
   onProjectNameChange,
+  toolPanel,
+  isFullscreen = false,
+  onToggleFullscreen,
   onUndoStroke,
   onRedoStroke,
   canUndo = false,
@@ -210,6 +216,7 @@ export function StageEditor({
   const layerPanelRef = useRef<HTMLDivElement | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLayerPanelOpen, setIsLayerPanelOpen] = useState(false)
+  const [isToolPanelOpen, setIsToolPanelOpen] = useState(false)
   const [isDeleteLayersOpen, setIsDeleteLayersOpen] = useState(false)
   const [deleteScope, setDeleteScope] = useState<'frame' | 'all'>('frame')
   const [layersToDelete, setLayersToDelete] = useState<Set<string>>(new Set())
@@ -399,8 +406,18 @@ export function StageEditor({
   if (!frame) {
     return (
       <div className="panel stage-placeholder">
-        <h2>No frames yet</h2>
-        <p>Upload a reference video to start extracting frames.</p>
+        <h2>Description</h2>
+        <p>
+          Drag a reference video here or start with a blank canvas to kick off your rotoscope. This workspace is built for
+          browser-first animation: auto-trace silhouettes with TensorFlow.js, clean them up with layered brushes, and keep
+          everything organized in a 12&nbsp;FPS timeline that behaves like classic flipbooks. When you’re ready, export the
+          sequence as a movie without leaving the tab.
+        </p>
+        <ul className="placeholder-highlights">
+          <li>TensorFlow.js edge detection with manual clean-up brushes</li>
+          <li>Layer visibility, onion skinning, and per-frame asset control</li>
+          <li>Konva-powered timeline with undo/redo and movie export</li>
+        </ul>
       </div>
     )
   }
@@ -493,8 +510,22 @@ export function StageEditor({
     return () => window.removeEventListener('mousedown', handleClickOutside)
   }, [isLayerPanelOpen])
 
+  useEffect(() => {
+    if (!isFullscreen) {
+      setIsToolPanelOpen(false)
+    }
+  }, [isFullscreen])
+
+  const toggleToolPanel = useCallback(() => {
+    setIsToolPanelOpen((value) => !value)
+  }, [])
+
+  const panelClassName = ['stage-panel', isFullscreen ? 'stage-panel--fullscreen' : '']
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div className="stage-panel">
+    <div className={panelClassName}>
       <div className="panel-header">
         <div>
           <input
@@ -508,7 +539,16 @@ export function StageEditor({
             Frame {frame.frameNumber + 1} • Canvas {frame.width} × {frame.height}px
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="stage-header-actions">
+          <button
+            type="button"
+            className={`stage-toolbar__btn stage-toolbar__btn--fullscreen${isFullscreen ? ' active' : ''}`}
+            onClick={onToggleFullscreen}
+            disabled={!onToggleFullscreen}
+            aria-pressed={isFullscreen}
+          >
+            {isFullscreen ? '⤡' : '⤢'}
+          </button>
           <button
             type="button"
             className="stage-toolbar__btn"
@@ -604,6 +644,22 @@ export function StageEditor({
               </div>
             )}
           </div>
+          {isFullscreen && toolPanel && (
+            <div className={`fullscreen-tool-panel ${isToolPanelOpen ? 'open' : ''}`} aria-live="polite">
+              <button
+                type="button"
+                className="fullscreen-tool-toggle"
+                onClick={toggleToolPanel}
+                aria-expanded={isToolPanelOpen}
+                aria-label="Toggle drawing tools"
+              >
+                ✏️
+              </button>
+              <div className="fullscreen-tool-content">
+                {toolPanel}
+              </div>
+            </div>
+          )}
           <Stage
             className="drawing-stage"
             width={stageWidth}
@@ -642,29 +698,23 @@ export function StageEditor({
                 {draftStroke ? renderStrokeLine(draftStroke, 'draft-stroke') : null}
               </Layer>
             )}
-            {/* Onion skin layer - show previous frame content at 40% opacity */}
+            {/* Onion skin layer - show previous frame drawing strokes only (no image/auto-trace layers) */}
             {onionSkin && prevFrame && (
-              <Layer opacity={0.2} listening={false}>
-                {/* Show previous frame background image */}
-                {(() => {
-                  const visibleImageLayer = prevFrame.layers.find(layer => layer.visible && layer.imageUrl)
-                  const imageUrl = visibleImageLayer?.imageUrl || prevFrame.imageUrl
-                  return imageUrl && <ImageLayerNode imageUrl={imageUrl} />
-                })()}
-                {/* Show previous frame strokes */}
-                {prevFrame.layers.filter(layer => layer.visible).map((layer, layerIndex) => (
-                  layer.strokes.filter(stroke => stroke.mode !== 'eraser').map((stroke, strokeIndex) => (
-                    <Line
-                      key={`onion-stroke-${layer.id}-${layerIndex}-${stroke.id}-${strokeIndex}`}
-                      points={stroke.points}
-                      stroke={stroke.color}
-                      strokeWidth={stroke.size}
-                      lineCap="round"
-                      lineJoin="round"
-                      listening={false}
-                    />
-                  ))
-                ))}
+              <Layer opacity={0.4} listening={false}>
+                {prevFrame.layers
+                  .filter((layer) => layer.visible && !layer.imageUrl)
+                  .flatMap((layer, layerIndex) =>
+                    layer.strokes
+                      .filter((stroke) => stroke.mode !== 'eraser')
+                      .map((stroke, strokeIndex) => {
+                        const key = `onion-stroke-${layer.id}-${layerIndex}-${stroke.id}-${strokeIndex}`
+                        return (
+                          <Group key={key} listening={false}>
+                            {renderStrokeLine(stroke, key)}
+                          </Group>
+                        )
+                      }),
+                  )}
               </Layer>
             )}
           </Stage>
@@ -837,7 +887,7 @@ export function StageEditor({
         </div>
       )}
 
-      {children}
+      {children ? <div className="stage-panel__timeline">{children}</div> : null}
     </div>
   )
 }

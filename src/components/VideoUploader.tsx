@@ -27,7 +27,7 @@ export function VideoUploader({
 
   return (
     <div className="panel">
-      <div className="panel-header">
+      <div className="panel-header panel-header--stack">
         <h2>{title}</h2>
         <p>{description}</p>
       </div>

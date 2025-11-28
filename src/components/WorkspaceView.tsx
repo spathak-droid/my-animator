@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 interface WorkspaceViewProps {
-  brushRail: ReactNode
+  brushRail?: ReactNode
   stageContent: ReactNode
 }
 

@@ -17,9 +17,12 @@ export function GettingStartedPanels({
     <main className="main-grid">
       <section className="left-column">
         <div className="panel">
-          <div className="panel-header">
+          <div className="panel-header panel-header--stack">
             <h2>1. Open a blank canvas</h2>
-            <p>Start sketching immediately with a fresh 720×405 stage.</p>
+            <p>
+              Start sketching immediately<br />
+              with a fresh 720×405 stage.
+            </p>
           </div>
           <div className="panel-body intro-panel">
             <button className="primary" onClick={onCreateBlankCanvas} disabled={isBusy}>
